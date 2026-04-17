@@ -3,23 +3,34 @@ from typing import Optional, Tuple
 import cv2
 import numpy as np
 
+mp_import_error = None
+mp_solutions = None
+
 try:
     import mediapipe as mp
-except ImportError:
+    if hasattr(mp, "solutions"):
+        mp_solutions = mp.solutions
+    else:
+        try:
+            from mediapipe.python import solutions as mp_solutions
+        except ImportError as exc:
+            mp_import_error = exc
+except Exception as exc:
     mp = None
+    mp_import_error = exc
 
 
 class PoseDetector:
     """MediaPipe pose detector for a single frame/region."""
 
     def __init__(self):
-        self.enabled = bool(mp is not None and hasattr(mp, "solutions"))
+        self.enabled = bool(mp is not None and mp_solutions is not None)
         self.warning_text = None
 
         if self.enabled:
-            self.mp_pose = mp.solutions.pose
-            self.mp_drawing = mp.solutions.drawing_utils
-            self.mp_drawing_styles = mp.solutions.drawing_styles
+            self.mp_pose = mp_solutions.pose
+            self.mp_drawing = mp_solutions.drawing_utils
+            self.mp_drawing_styles = mp_solutions.drawing_styles
             self.pose = self.mp_pose.Pose(
                 # Real-time stream mode for smoother tracking across frames.
                 static_image_mode=False,
@@ -30,7 +41,25 @@ class PoseDetector:
             )
         else:
             self.pose = None
-            self.warning_text = "MediaPipe Pose unavailable on this Python build (try Python 3.11)."
+            if mp is None:
+                error_text = str(mp_import_error) if mp_import_error is not None else ""
+                if "module 'attr' has no attribute 's'" in error_text:
+                    self.warning_text = (
+                        "Broken attrs install in current venv. "
+                        "Run with .\\.venv311\\Scripts\\python.exe or reinstall attrs."
+                    )
+                else:
+                    self.warning_text = "MediaPipe is not installed. Use .\\.venv311\\Scripts\\python.exe."
+            elif mp_import_error is not None:
+                self.warning_text = (
+                    "MediaPipe Pose API not available in this interpreter. "
+                    "Use Python 3.11 with mediapipe==0.10.8."
+                )
+            else:
+                self.warning_text = (
+                    "MediaPipe Pose unavailable on this Python build. "
+                    "Use .\\.venv311\\Scripts\\python.exe."
+                )
 
     def detect(self, frame_bgr: np.ndarray) -> Tuple[Optional[np.ndarray], np.ndarray]:
         """

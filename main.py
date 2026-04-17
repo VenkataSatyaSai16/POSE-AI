@@ -33,6 +33,12 @@ def main():
 
     try:
         while True:
+            try:
+                if cv2.getWindowProperty(WINDOW_NAME, cv2.WND_PROP_VISIBLE) < 1:
+                    break
+            except cv2.error:
+                break
+
             frame = camera.read()
             if frame is None:
                 print("Failed to read camera frame.")
